@@ -4,32 +4,26 @@ const mongoose = require("mongoose");
 const { hashPassword, comparePassword } = require("../helpers/userAuth");
 const { mailSend } = require("../mailsend/mailsend.helper");
 const {
-  registerEmail} = require("../mailsend/mailHtmlHelper/registerEmail.healper");
-  const{sendRegisterOTPEmail}= require("../mailsend/mailHtmlHelper/registerOtpSend.helper")
+  registerEmail,
+} = require("../mailsend/mailHtmlHelper/registerEmail.healper");
+const {
+  sendRegisterOTPEmail,
+} = require("../mailsend/mailHtmlHelper/registerOtpSend.helper");
 const jwt = require("jsonwebtoken");
-const cookies = require("cookies");
 
+const userOtpVerificationModel = require("../model/userOtpVerification.model");
+const { forgotOtp } = require("../mailsend/mailHtmlHelper/forgotOtpEmail");
 
-
-exports.sendSignupOtpController =    async (req, res) => {
+const sendOtpVerificationEmail = async ({ result, res }) => {
   try {
-    const { email, password, username } = req.body;
-
-    if (!email || !password || !username) {
-      return res.status(400).json({ msg: "Please enter all the fields" });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ msg: "Password should be at least 6 characters" });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ msg: "User with the same email already exists" });
-    }
+    const id = result._id.toString();
+    const email = result.email;
+    console.log("id kya hai bhai", id);
+    console.log("email kya hai bhai", email);
 
     const otpCode = Math.floor(1000 + Math.random() * 9000);
-    await Otp.create({
+    await userOtpVerificationModel.create({
+      userId: id,
       email: email,
       code: otpCode,
       expireIn: new Date().getTime() + 300 * 1000, // 5 minutes
@@ -38,24 +32,41 @@ exports.sendSignupOtpController =    async (req, res) => {
     const emailType = "RegisterOTP";
     await mailSend(email, emailType, sendRegisterOTPEmail(otpCode));
 
-    res.status(200).json({ msg: "OTP sent to email" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.send({
+      status: "PENDING",
+      msg: "Verification Otp email sent",
+      data: {
+        userId: id,
+        email: email,
+      },
+    });
+  } catch (error) {
+    res.send({
+      status: "FAILED",
+      message: error.message,
+    });
   }
 };
 
-exports.verifysignupcontroller = async (req, res) => {
+exports.sendSignupController = async (req, res) => {
   try {
-    const { otp,email,username,password } = req.body;
-    const user = await User.findOne({ email });
-  
-    const otpData = await Otp.findOne({ email });
-    if (!otpData || otpData.code !== otp) {
-      return res.status(400).json({ msg: "Invalid OTP" });
+    const { email, password, username } = req.body;
+
+    if (!email || !password || !username) {
+      return res.status(400).json({ msg: "Please enter all the fields" });
     }
 
-    if (otpData.expireIn < new Date().getTime()) {
-      return res.status(400).json({ msg: "OTP has expired" });
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ msg: "Password should be at least 6 characters" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ msg: "User with the same email already exists" });
     }
 
     const hashedPassword = await hashPassword({ password });
@@ -64,24 +75,55 @@ exports.verifysignupcontroller = async (req, res) => {
       email,
       username,
       password: hashedPassword,
+      verified: false,
     });
 
     const savedUser = await newUser.save();
 
-    const emailType = "Register";
-    await mailSend(email, emailType, registerEmail(username));
+    await sendOtpVerificationEmail({ result: savedUser, res });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
-    // Remove password from the response
+exports.verifySignupController = async (req, res) => {
+  try {
+    const { otp, email } = req.body;
+    console.log(email, otp);
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "User not found" });
+    }
+
+    const otpData = await userOtpVerificationModel.findOne({ email });
+    if (!otpData || otpData.code !== otp) {
+      return res.status(400).json({ msg: "Invalid OTP" });
+    }
+
+    if (otpData.expireIn < new Date().getTime()) {
+      return res.status(400).json({ msg: "OTP has expired" });
+    }
+
+    user.verified = true;
+    await user.save();
+
+    await userOtpVerificationModel.deleteOne({ email });
+
+    const emailType = "Register";
+    await mailSend(email, emailType, registerEmail(user.username));
+
     const userResponse = {
-      _id: savedUser._id,
-      email: savedUser.email,
-      username: savedUser.username,
-      createdAt: savedUser.createdAt,
-      updatedAt: savedUser.updatedAt,
+
+      _id: user._id,
+      email: user.email,
+      username: user.username,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
 
     res.status(200).json({
-      msg: "Account created successfully",
+      msg: "Account verified and created successfully",
+      success: true,
       user: userResponse,
     });
   } catch (err) {
@@ -89,53 +131,55 @@ exports.verifysignupcontroller = async (req, res) => {
   }
 };
 
-
-
-//login controller logic
 exports.logincontroller = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    // check validation: all fields are fulfilled or not
-    if (!email || !password) {
+    const { username, email, password } = req.body;
+    console.log(password,email);
+    // Check validation: all fields are fulfilled or not
+    if (!password || !(email || username)) {
       return res.status(400).json({ msg: "Please enter all the fields" });
     }
 
-    // find user by email
-    const user = await User.findOne({ email });
+    // Find user by email or username
+    const user = await User.findOne({ $or: [{ email }, { username }] });
     if (!user) {
       return res
         .status(400)
-        .json({ msg: "User with this email does not exist" });
+        .json({ msg: "User with this email or username does not exist" });
     }
 
-    // compare password
+    // Check if user is verified
+    if (!user.verified) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    // Compare password
     const match = await comparePassword(password, user.password);
     if (!match) {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
-    // generate JWT token
+    // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY_TOKEN, {
-      expiresIn: "1h", // set token expiry time
+      expiresIn: "1hr", // Set token expiry time
     });
 
-    // set token as HTTP-only cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      maxAge: 3600000, // 1 hour in milliseconds
-    });
+    // Set token as HTTP-only cookie
+    // res.cookie("token", token, {
+    //   httpOnly: true,
+    //   secure: true, // Secure flag should be true in production
+    //   maxAge: 3600000, // 1 hour in milliseconds
+    // });
 
-    user.password = undefined; // remove password from response
+    user.password = undefined; // Remove password from response
 
-    // send response
+    // Send response
     res.status(200).json({ user, token, msg: "Logged in successfully!" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-//send otp contoller logic
 // otp send for forgetpassword
 exports.otpSendforgot = async (req, res) => {
   try {
@@ -166,14 +210,11 @@ exports.otpSendforgot = async (req, res) => {
       }
       //  console.log(otpCode.code)
       //send otp of email
-      // const emailType = "OTP";
-      // const emailSendOtp = mailSend(
-      //   email,
-      //   emailType,
-      //   sendOTPEmail(otpCode.code)
-      // );
+      const emailType = "ForgetOTP";
+      const emailSendOtp = mailSend(email, emailType, forgotOtp(otpCode.code));
 
       res.status(200).send({
+        success: true,
         msg: "Email has been sent",
         data: otpCode,
       });
@@ -188,7 +229,7 @@ exports.otpSendforgot = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { email, otp, password } = req.body;
-
+console.log(email,otp,password)
     // Find user by email
     const user = await User.findOne({ email });
 
@@ -226,7 +267,7 @@ exports.changePassword = async (req, res) => {
     // Clear OTP after reset
     await Otp.deleteOne({ email });
 
-    res.status(200).json({ msg: "Password reset successfully" });
+    res.status(200).json({ msg: "Password reset successfully", success: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Server Error" });
@@ -245,5 +286,24 @@ exports.userProfileController = async (req, res) => {
     res.json.status(500)({
       msg: error.message,
     });
+  }
+};
+
+//logout
+exports.logout = async (req, res) => {
+  try {
+    console.log(req.userId);
+    res
+      .status(201)
+      .cookie("token", "", {
+        httpOnly: true,
+        expires: new Date(Date.now()),
+      })
+      .json({
+        success: true,
+        msg: "Logged Out Successfully.",
+      });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 };

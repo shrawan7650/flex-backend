@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 exports.varifyToken = (req, res, next) => {
   try {
-    const token = req.headers.authorization;
+    const token = req.headers.authorization||req.cookies.token; 
+    console.log("token hai kya bhai",token)
     if (!token) {
       return res.status(403).json({ message: "No token provided" });
     }

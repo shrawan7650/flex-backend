@@ -28,16 +28,16 @@ exports.mailSend = async (email, emailType, html) => {
         });
         break;
 
-      // case "Contact":
-      //   transporter = nodemailer.createTransport({
-      //     host: "smtp.gmail.com",
-      //     secure: true,
-      //     auth: {
-      //       user: process.env.EMAIL_USERNAME,
-      //       pass: process.env.EMAIL_PASSWORD,
-      //     },
-      //   });
-      //   break;
+      case "ForgetOTP":
+        transporter = nodemailer.createTransport({
+          host: "smtp.gmail.com",
+          secure: true,
+          auth: {
+            user: process.env.EMAIL_USERNAME,
+            pass: process.env.EMAIL_PASSWORD,
+          },
+        });
+        break;
       //   case "Payment":
       //     transporter = nodemailer.createTransport({
       //       host: "smtp.gmail.com",
@@ -84,8 +84,8 @@ function getSubject(emailType) {
       return "Welcome to Our FlexiGeeks Project";
     case "RegisterOTP":
       return "OTP Verification";
-    // case "Contact":
-    //   return "Contact Form Submission Confirmation";
+    case "ForgetOTP":
+      return "ForgetOTP account";
     //   case "Payment":
     //     return "Payment Successfully";
     //     case "ProfileUpdate":
