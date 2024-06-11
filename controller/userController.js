@@ -13,6 +13,7 @@ const jwt = require("jsonwebtoken");
 
 const userOtpVerificationModel = require("../model/userOtpVerification.model");
 const { forgotOtp } = require("../mailsend/mailHtmlHelper/forgotOtpEmail");
+const TemporaryUser = require("../model/temporaryUserSchema.model");
 
 const sendOtpVerificationEmail = async ({ result, res }) => {
   try {
@@ -21,26 +22,39 @@ const sendOtpVerificationEmail = async ({ result, res }) => {
     console.log("id kya hai bhai", id);
     console.log("email kya hai bhai", email);
 
-    const otpCode = Math.floor(1000 + Math.random() * 9000);
-    await userOtpVerificationModel.create({
-      userId: id,
-      email: email,
-      code: otpCode,
-      expireIn: new Date().getTime() + 300 * 1000, // 5 minutes
-    });
+    // Generate a random OTP code
+    let otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // Check for existing unverified OTP
+    const existingOtp = await userOtpVerificationModel.findOne({ email });
+    console.log(existingOtp);
+
+    if (existingOtp) {
+      console.log(`Reusing existing OTP: ${existingOtp.code}`);
+      otpCode = existingOtp.code;
+    } else {
+      await userOtpVerificationModel.create({
+        userId: id,
+        email: email,
+        code: otpCode,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // Set expiration date to 5 minutes from now
+      });
+      console.log(`Generated new OTP: ${otpCode}`);
+    }
 
     const emailType = "RegisterOTP";
     await mailSend(email, emailType, sendRegisterOTPEmail(otpCode));
 
     res.send({
       status: "PENDING",
-      msg: "Verification Otp email sent",
+      msg: "Verification OTP email sent",
       data: {
         userId: id,
         email: email,
       },
     });
   } catch (error) {
+    console.error("Error in sendOtpVerificationEmail:", error); // Log the error
     res.send({
       status: "FAILED",
       message: error.message,
@@ -48,11 +62,16 @@ const sendOtpVerificationEmail = async ({ result, res }) => {
   }
 };
 
+const cleanUpExpiredTempUsers = async (email) => {
+  const expirationTime = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+  await TemporaryUser.deleteMany({ email, createdAt: { $lt: expirationTime } });
+};
+
 exports.sendSignupController = async (req, res) => {
   try {
     const { email, password, username } = req.body;
 
-    if (!email || !password || !username) {
+    if (!password || !(email || username)) {
       return res.status(400).json({ msg: "Please enter all the fields" });
     }
 
@@ -62,26 +81,36 @@ exports.sendSignupController = async (req, res) => {
         .json({ msg: "Password should be at least 6 characters" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res
         .status(400)
         .json({ msg: "User with the same email already exists" });
     }
 
+    // Clean up expired temporary users
+    await cleanUpExpiredTempUsers(email);
+
+    const existingTempUser = await TemporaryUser.findOne({ email });
+    if (existingTempUser) {
+      return res
+        .status(400)
+        .json({ msg: "OTP already sent. Please verify OTP." });
+    }
+
     const hashedPassword = await hashPassword({ password });
 
-    const newUser = new User({
+    const newTempUser = new TemporaryUser({
       email,
       username,
       password: hashedPassword,
-      verified: false,
     });
 
-    const savedUser = await newUser.save();
+    const savedTempUser = await newTempUser.save();
 
-    await sendOtpVerificationEmail({ result: savedUser, res });
+    await sendOtpVerificationEmail({ result: savedTempUser, res });
   } catch (err) {
+    console.error("Error in sendSignupController:", err); // Log the error
     res.status(500).json({ error: err.message });
   }
 };
@@ -90,8 +119,9 @@ exports.verifySignupController = async (req, res) => {
   try {
     const { otp, email } = req.body;
     console.log(email, otp);
-    const user = await User.findOne({ email });
-    if (!user) {
+
+    const tempUser = await TemporaryUser.findOne({ email });
+    if (!tempUser) {
       return res.status(400).json({ msg: "User not found" });
     }
 
@@ -100,25 +130,31 @@ exports.verifySignupController = async (req, res) => {
       return res.status(400).json({ msg: "Invalid OTP" });
     }
 
-    if (otpData.expireIn < new Date().getTime()) {
+    if (new Date() > otpData.expiresAt) {
       return res.status(400).json({ msg: "OTP has expired" });
     }
 
-    user.verified = true;
-    await user.save();
+    const newUser = new User({
+      email: tempUser.email,
+      username: tempUser.username,
+      password: tempUser.password,
+      verified: true,
+    });
 
+    await newUser.save();
+
+    await TemporaryUser.deleteOne({ email });
     await userOtpVerificationModel.deleteOne({ email });
 
     const emailType = "Register";
-    await mailSend(email, emailType, registerEmail(user.username));
+    await mailSend(email, emailType, registerEmail(newUser.username));
 
     const userResponse = {
-
-      _id: user._id,
-      email: user.email,
-      username: user.username,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      _id: newUser._id,
+      email: newUser.email,
+      username: newUser.username,
+      createdAt: newUser.createdAt,
+      updatedAt: newUser.updatedAt,
     };
 
     res.status(200).json({
@@ -134,7 +170,7 @@ exports.verifySignupController = async (req, res) => {
 exports.logincontroller = async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    console.log(password,email);
+    console.log(password, email);
     // Check validation: all fields are fulfilled or not
     if (!password || !(email || username)) {
       return res.status(400).json({ msg: "Please enter all the fields" });
@@ -180,19 +216,19 @@ exports.logincontroller = async (req, res) => {
   }
 };
 
+
 // otp send for forgetpassword
+
+
+
+
+
 exports.otpSendforgot = async (req, res) => {
   try {
     const { email } = req.body;
     console.log(email);
     const user = await User.findOne({ email });
     console.log(user);
-    // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    // if (!emailRegex.test(email)) {
-    //   return res.status(400).send({
-    //     msg: "Invalid email address",
-    //   });
-    // }
 
     if (!user) {
       return res.status(404).send({
@@ -200,27 +236,51 @@ exports.otpSendforgot = async (req, res) => {
         msg: "Email does not exist",
       });
     } else {
-      let otpCode = Math.floor(1000 + Math.random() * 9000);
-      if (otpCode >= 4) {
-        otpCode = await Otp.create({
+      let otpCode;
+      const existingOtp = await Otp.findOne({ email, verified: false });
+
+      if (existingOtp) {
+        const currentTime = new Date();
+        if (currentTime < existingOtp.expiresAt) {
+          // Reuse existing unverified OTP if it's within the 5-minute window
+          otpCode = existingOtp.code;
+          console.log(`Reusing existing OTP: ${otpCode}`);
+        } else {
+          // If existing OTP has expired, delete it and generate a new OTP
+          await Otp.deleteOne({ email, verified: false });
+          otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+          await Otp.create({
+            email: email,
+            code: otpCode,
+            verified: false,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // Set expiration date to 5 minutes from now
+          });
+          console.log(`Generated new OTP: ${otpCode}`);
+        }
+      } else {
+        // Generate a new OTP if no existing unverified OTP is found
+        otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+        await Otp.create({
           email: email,
           code: otpCode,
-          expireIn: new Date().getTime() + 300 * 1000,
+          verified: false,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000), // Set expiration date to 5 minutes from now
         });
+        console.log(`Generated new OTP: ${otpCode}`);
       }
-      //  console.log(otpCode.code)
-      //send otp of email
+
+      // Send OTP via email
       const emailType = "ForgetOTP";
-      const emailSendOtp = mailSend(email, emailType, forgotOtp(otpCode.code));
+      await mailSend(email, emailType, forgotOtp(otpCode));
 
       res.status(200).send({
         success: true,
         msg: "Email has been sent",
-        data: otpCode,
+        data: { email, otpCode },
       });
     }
   } catch (err) {
-    // console.error(err);
+    console.error(err);
     res.status(500).send({ msg: err.message });
   }
 };
@@ -229,7 +289,7 @@ exports.otpSendforgot = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { email, otp, password } = req.body;
-console.log(email,otp,password)
+    console.log(email, otp, password);
     // Find user by email
     const user = await User.findOne({ email });
 
@@ -249,17 +309,16 @@ console.log(email,otp,password)
       return res.status(400).json({ msg: "Invalid OTP" });
     }
 
-    // const passwordRegex =
-    //   /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{6,}$/;
-    // if (!passwordRegex.test(newPassword)) {
-    //   return res.status(400).send({
-    //     msg: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one symbol (!@#$%^&*)",
-    //   });
-    // }
+    // Check if OTP has expired
+    const currentTime = new Date();
+    if (currentTime > otpData.expiresAt) {
+      // If OTP has expired, prevent password change and return error
+      return res.status(400).json({ msg: "OTP has expired" });
+    }
 
     // Hash new password
-
     const hashedPassword = await hashPassword({ password });
+
     // Update user's password
     user.password = hashedPassword;
     await user.save();
@@ -273,6 +332,7 @@ console.log(email,otp,password)
     res.status(500).json({ msg: "Server Error" });
   }
 };
+
 exports.userProfileController = async (req, res) => {
   try {
     //user id get from the middlewear
