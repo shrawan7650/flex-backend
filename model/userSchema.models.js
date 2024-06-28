@@ -19,23 +19,34 @@ const userSchema = new mongoose.Schema(
       required: true,
       type: String,
     },
-    verified:{
-      type:Boolean,
-      default:false
-    }
-    // confirmpassword: {
-    //   required: true,
-    //   type: String,
-    //   trim: true,
-    // },
-    // role: {
-    //   // required: true,
-    //   type: String,
-    //   enum: ["user", "admin"],
-    // },
-    // image: {
-    //   type:String
-    // },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    collageName: {
+      type: String,
+      default: null,
+    },
+    phoneNumber: {
+      type: Number,
+      default: null,
+    },
+    githubLink: {
+      type: String,
+      default: null,
+    },
+    state: {
+      type: String,
+      default: null,
+    },
+    image: {
+      type: String,
+    },
+    bio: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Bio",
+      default: null,
+    },
   },
   { timestamps: true }
 );

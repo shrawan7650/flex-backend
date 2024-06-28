@@ -14,6 +14,8 @@ const jwt = require("jsonwebtoken");
 const userOtpVerificationModel = require("../model/userOtpVerification.model");
 const { forgotOtp } = require("../mailsend/mailHtmlHelper/forgotOtpEmail");
 const TemporaryUser = require("../model/temporaryUserSchema.model");
+const { uploadFileOnCloudinary } = require("../utils/cloudinary/cloudniary");
+const Bio = require("../model/bioSchema.model");
 
 const sendOtpVerificationEmail = async ({ result, res }) => {
   try {
@@ -216,12 +218,7 @@ exports.logincontroller = async (req, res) => {
   }
 };
 
-
 // otp send for forgetpassword
-
-
-
-
 
 exports.otpSendforgot = async (req, res) => {
   try {
@@ -367,3 +364,136 @@ exports.logout = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+exports.updateUserAvatar = async (req, res) => {
+  try {
+    const avatarLocalPath = req.file?.path;
+    console.log("id", req.userId);
+    console.log("avatarLocalPath", avatarLocalPath);
+
+    if (!avatarLocalPath) {
+      return res.status(400).send({ msg: "Avatar file is missing" });
+    }
+
+    const avatar = await uploadFileOnCloudinary(avatarLocalPath);
+    console.log("avatar", avatar);
+
+    if (!avatar) {
+      return res.status(400).send({ msg: "Error while uploading avatar" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { image: avatar.url },
+      { new: true }
+    ).select("-password");
+
+    return res
+      .status(200)
+      .send({ msg: "Avatar updated successfully", user: user });
+  } catch (error) {
+    return res.status(500).send({ msg: error.message });
+  }
+};
+
+ 
+exports.updateProfileController = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      name,
+      email,
+      collageName,
+      githubLink,
+      phoneNumber,
+      state,
+    } = req.body; 
+    console.log("datauser",name,email,collageName,githubLink,phoneNumber,state)// Make sure to retrieve text fields from req.body
+    const avatarLocalPath = req.file?.path;
+
+    console.log("id", userId);
+    console.log("avatarLocalPath", avatarLocalPath);
+
+    // Find the user to update
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).send({ msg: "User not found" });
+    }
+    // if (user.email) {
+    //   return res.status(404).send({ msg: "existing email" });
+    // }
+
+    // If an avatar is provided, upload it to Cloudinary
+    if (avatarLocalPath) {
+      const avatar = await uploadFileOnCloudinary(avatarLocalPath);
+      if (!avatar) {
+        return res.status(400).send({ msg: "Error while uploading avatar" });
+      }
+      user.image = avatar;
+    }
+
+    // Update other fields if they are provided in the request body
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.collageName = collageName || user.collageName;
+    user.githubLink = githubLink || user.githubLink;
+    user.phoneNumber = phoneNumber || user.phoneNumber;
+    user.state = state || user.state;
+
+    // Save the updated user
+    const updatedUser = await user.save();
+
+    return res.status(200).send({ msg: "Profile updated successfully", user: updatedUser });
+  } catch (error) {
+    return res.status(500).send({ msg: error.message });
+  }
+};
+
+
+ exports.bioUpdateController = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { userBio, userExperience, languages } = req.body;
+
+    // Find the user and populate the bio reference
+    const user = await User.findById(userId).populate('bio');
+
+    if (!user) {
+      return res.status(404).send({ msg: "User not found" });
+    }
+
+    // Check if the user has an existing bio
+    let bio;
+    if (user.bio) {
+      // If the bio exists, update it
+      bio = await Bio.findById(user.bio._id);
+      bio.userBio = userBio !== undefined ? userBio : bio.userBio;
+      bio.userExperience = userExperience !== undefined ? userExperience : bio.userExperience;
+      bio.languages = languages !== undefined ? (Array.isArray(languages) ? languages : languages.split(',')) : bio.languages;
+    } else {
+      // If the bio does not exist, create a new one
+      bio = new Bio({
+        user: user._id,
+        userBio,
+        userExperience,
+        language: languages ? (Array.isArray(languages) ? languages : languages.split(',')) : [],
+      });
+    }
+
+    // Save the updated bio
+    const savedBio = await bio.save();
+
+    // If the user did not have a bio, associate the new bio with the user
+    if (!user.bio) {
+      user.bio = savedBio._id;
+      await user.save();
+    }
+
+    return res.status(200).send({ msg: "Bio updated successfully", bio: savedBio });
+  } catch (error) {
+    return res.status(500).send({ msg: error.message });
+  }
+};
+
+
+
