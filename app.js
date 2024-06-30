@@ -2,7 +2,8 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const morgan = require("morgan");
-const route = require("./routes/user/userRoutes");
+const userRoute = require("./routes/user/userRoutes");
+const projectRoute =  require("./routes/project/allProject")
 const cookieParser = require("cookie-parser");
 //use middlewear
 app.use(express.json());
@@ -20,6 +21,8 @@ app.use(
 );
 
 //routes all
-app.use("/api/users", route);
+app.use("/api/users", userRoute);
+
+app.use("/api/projects", projectRoute);
 
 module.exports = app;

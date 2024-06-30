@@ -197,9 +197,10 @@ exports.logincontroller = async (req, res) => {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
+
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY_TOKEN, {
-      expiresIn: "1hr", // Set token expiry time
+      expiresIn: '30m', // 30 minutes
     });
 
     // Set token as HTTP-only cookie
@@ -410,15 +411,15 @@ exports.updateProfileController = async (req, res) => {
     } = req.body;
 
 
-    console.log("name", name)
-    console.log("email", email)
-    console.log("collageName", collageName)
-    console.log("githubLink", githubLink)
-    console.log("phoneNumber", phoneNumber)
-    console.log("state", state)
+    // console.log("name", name)
+    // console.log("email", email)
+    // console.log("collageName", collageName)
+    // console.log("githubLink", githubLink)
+    // console.log("phoneNumber", phoneNumber)
+    // console.log("state", state)
 
 
-    console.log("userId", userId)
+    // console.log("userId", userId)
 
 
 
