@@ -5,7 +5,7 @@ const router = express.Router();
 
 
 // require function from controller
-const{sendSignupController,logincontroller,otpSendforgot,changePassword,userProfileController,verifySignupController,logout,updateUserAvatar,updateProfileController,bioUpdateController,bioGetDataController}=require('../../controller/userController.js');
+const{sendSignupController,logincontroller,otpSendforgot,changePassword,userProfileController,verifySignupController,logout,updateProfileController,bioUpdateController,bioGetDataController}=require('../../controller/userController.js');
 const {varifyToken} = require("../../middlewear/authMiddlewear");
 const { upload } = require('../../middlewear/multerMiddleweare.js');
 

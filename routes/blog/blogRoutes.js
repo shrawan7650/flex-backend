@@ -1,5 +1,5 @@
 const express = require('express');
-const { upload } = require('../../middlewear/multerMiddleweare');
+
 const {  getAllBlogController, getBlogByIdController } = require('../../controller/blogController');
 const router = express.Router();
 

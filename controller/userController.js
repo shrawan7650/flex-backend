@@ -367,36 +367,6 @@ exports.logout = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
-// exports.updateUserAvatar = async (req, res) => {
-//   try {
-//     const avatarLocalPath = req.file?.path;
-//     console.log("id", req.userId);
-//     console.log("avatarLocalPath", avatarLocalPath);
-
-//     if (!avatarLocalPath) {
-//       return res.status(400).send({ msg: "Avatar file is missing" });
-//     }
-
-//     const avatar = await uploadFileOnCloudinary(avatarLocalPath);
-//     console.log("avatar", avatar);
-
-//     if (!avatar) {
-//       return res.status(400).send({ msg: "Error while uploading avatar" });
-//     }
-
-//     const user = await User.findByIdAndUpdate(
-//       req.userId,
-//       { image: avatar.url },
-//       { new: true }
-//     ).select("-password");
-
-//     return res
-//       .status(200)
-//       .send({ msg: "Avatar updated successfully", user: user });
-//   } catch (error) {
-//     return res.status(500).send({ msg: error.message });
-//   }
-// };
 
 
 exports.updateProfileController = async (req, res) => {
