@@ -2,7 +2,7 @@ const User = require("../model/userSchema.models");
 const Otp = require("../model/otpSchema.model");
 const mongoose = require("mongoose");
 const { hashPassword, comparePassword } = require("../helpers/userAuth");
-const { mailSend } = require("../mailsend/mailsend.helper");
+// const { mailSend } = require("../mailsend/mailsend.helper");
 const {
   registerEmail,
 } = require("../mailsend/mailHtmlHelper/registerEmail.healper");
@@ -16,6 +16,7 @@ const { forgotOtp } = require("../mailsend/mailHtmlHelper/forgotOtpEmail");
 const TemporaryUser = require("../model/temporaryUserSchema.model");
 const { uploadFileOnCloudinary } = require("../utils/cloudinary/cloudniary");
 const Bio = require("../model/bioSchema.model");
+const { mailFlexSend } = require("../mailsend/flexMailSend/mailSend.Flex.help");
 
 const sendOtpVerificationEmail = async ({ result, res }) => {
   try {
@@ -43,9 +44,9 @@ const sendOtpVerificationEmail = async ({ result, res }) => {
       });
       console.log(`Generated new OTP: ${otpCode}`);
     }
-
+const registerEmailContent =  sendRegisterOTPEmail(otpCode);
     const emailType = "RegisterOTP";
-    await mailSend(email, emailType, sendRegisterOTPEmail(otpCode));
+    await mailFlexSend( emailType,registerEmailContent,email);
 
     res.send({
       status: "PENDING",
@@ -149,7 +150,8 @@ exports.verifySignupController = async (req, res) => {
     await userOtpVerificationModel.deleteOne({ email });
 
     const emailType = "Register";
-    await mailSend(email, emailType, registerEmail(newUser.username));
+    const registerEmailContent =  registerEmail(newUser.username);
+    await mailFlexSend(emailType,registerEmailContent,email);
 
     const userResponse = {
       _id: newUser._id,
@@ -197,10 +199,9 @@ exports.logincontroller = async (req, res) => {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
-
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY_TOKEN, {
-      expiresIn: '30m', // 30 minutes
+      expiresIn: "1hr", // Set token expiry time
     });
 
     // Set token as HTTP-only cookie
@@ -269,7 +270,8 @@ exports.otpSendforgot = async (req, res) => {
 
       // Send OTP via email
       const emailType = "ForgetOTP";
-      await mailSend(email, emailType, forgotOtp(otpCode));
+      const forgotEmailContent = forgotOtp(otpCode,user. username);
+      await mailFlexSend(emailType,forgotEmailContent,email );
 
       res.status(200).send({
         success: true,
@@ -365,38 +367,37 @@ exports.logout = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
-exports.updateUserAvatar = async (req, res) => {
-  try {
-    const avatarLocalPath = req.file?.path;
-    console.log("id", req.userId);
-    console.log("avatarLocalPath", avatarLocalPath);
+// exports.updateUserAvatar = async (req, res) => {
+//   try {
+//     const avatarLocalPath = req.file?.path;
+//     console.log("id", req.userId);
+//     console.log("avatarLocalPath", avatarLocalPath);
 
-    if (!avatarLocalPath) {
-      return res.status(400).send({ msg: "Avatar file is missing" });
-    }
+//     if (!avatarLocalPath) {
+//       return res.status(400).send({ msg: "Avatar file is missing" });
+//     }
 
-    const avatar = await uploadFileOnCloudinary(avatarLocalPath);
-    console.log("avatar", avatar);
+//     const avatar = await uploadFileOnCloudinary(avatarLocalPath);
+//     console.log("avatar", avatar);
 
-    if (!avatar) {
-      return res.status(400).send({ msg: "Error while uploading avatar" });
-    }
+//     if (!avatar) {
+//       return res.status(400).send({ msg: "Error while uploading avatar" });
+//     }
 
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { image: avatar.url },
-      { new: true }
-    ).select("-password");
+//     const user = await User.findByIdAndUpdate(
+//       req.userId,
+//       { image: avatar.url },
+//       { new: true }
+//     ).select("-password");
 
-    return res
-      .status(200)
-      .send({ msg: "Avatar updated successfully", user: user });
-  } catch (error) {
-    return res.status(500).send({ msg: error.message });
-  }
-};
+//     return res
+//       .status(200)
+//       .send({ msg: "Avatar updated successfully", user: user });
+//   } catch (error) {
+//     return res.status(500).send({ msg: error.message });
+//   }
+// };
 
- 
 
 exports.updateProfileController = async (req, res) => {
   try {
@@ -411,15 +412,15 @@ exports.updateProfileController = async (req, res) => {
     } = req.body;
 
 
-    // console.log("name", name)
-    // console.log("email", email)
-    // console.log("collageName", collageName)
-    // console.log("githubLink", githubLink)
-    // console.log("phoneNumber", phoneNumber)
-    // console.log("state", state)
+    console.log("name", name)
+    console.log("email", email)
+    console.log("collageName", collageName)
+    console.log("githubLink", githubLink)
+    console.log("phoneNumber", phoneNumber)
+    console.log("state", state)
 
 
-    // console.log("userId", userId)
+    console.log("userId", userId)
 
 
 
@@ -536,7 +537,4 @@ exports.bioGetDataController = async (req, res) => {
     return res.status(500).send({ msg: error.message });
   }
 };
-
-
-
 

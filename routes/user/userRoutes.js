@@ -21,14 +21,14 @@ router.post('/changepassword', changePassword);
 router.get('/logout',varifyToken, logout);
 router.get('/profile', varifyToken, userProfileController);
 router.patch('/updateProfile', varifyToken, upload.single("avatar"),updateProfileController);
-router.patch('/bioUpdate', varifyToken, bioUpdateController);
+router.patch('/bioUpdateuser', varifyToken, bioUpdateController);
 router.get('/getBioData', varifyToken, bioGetDataController);
-router.patch(
-  "/updateAvatar",
-  varifyToken,
-  upload.single("avatar"),
-  updateUserAvatar,
-);
+// router.patch(
+//   "/updateAvatar",
+//   varifyToken,
+//   upload.single("avatar"),
+//   updateUserAvatar,
+// );
 
 
  module.exports = router;

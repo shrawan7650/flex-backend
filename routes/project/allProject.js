@@ -5,7 +5,7 @@ const { contributionRegister,proposalController, aboutContoller ,newslettlerCont
 const { upload } = require('../../middlewear/multerMiddleweare');
 
 router.post("/contribtionRegister/:email", contributionRegister);
-router.post("/propsal/:email", upload.single("avatar"), proposalController);
+router.post("/propsal", upload.single("avatar"), proposalController);
 router.post("/about",aboutContoller)
 router.post("/newsletter",newslettlerController)
 

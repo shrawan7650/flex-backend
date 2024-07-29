@@ -4,6 +4,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const userRoute = require("./routes/user/userRoutes");
 const matrial = require("./routes/material/materialRoutes")
+const blogRoute = require("./routes/blog/blogRoutes");
 // const userAuthRoute = require("./routes/user/auth/userAuth")
 const projectRoute =  require("./routes/project/allProject")
 const cookieParser = require("cookie-parser");
@@ -34,6 +35,7 @@ app.use(
 //routes all
 app.use("/api/users", userRoute);
 // app.use("/auth",userAuthRoute)
+app.use("/api/blog",blogRoute)
 app.use("/folders",matrial)
 app.use("/api/projects", projectRoute);
 

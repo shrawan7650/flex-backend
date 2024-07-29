@@ -1,74 +1,46 @@
 require("dotenv").config();
 const nodemailer = require("nodemailer");
 
-exports.mailFlexSend = async (email, emailType, html) => {
+exports.mailFlexSend = async (emailType, html, email, htmladmin) => {
+  console.log("emailtype",emailType)
   try {
-    let transporter;
-    console.log(emailType);
-    switch (emailType) {
-      case "ContributionRegister":
-        transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          secure: true,
-          auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-          },
-        });
-        break;
-      case "Proposal":
-        transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          secure: true,
-          auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-          },
-        });
-        break;
-      case "About":
-        transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          secure: true,
-          auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-          },
-        });
-        break;
-      case "Newsletter":
-        transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          secure: true,
-          auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-          },
-        });
-        break;
+    let transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USERNAME,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
 
-      default:
-        throw new Error("Invalid email type");
-    }
+    const mailOptionsAdmin = {
+      from: process.env.EMAIL_USERNAME,
+      to: process.env.EMAIL_USERNAME, // Admin's email
+      subject: getSubject(emailType),
+      html: htmladmin,
+    };
 
-    const mailOptions = {
-      from: process.env.EMAIL_USERNAME, // Admin's email
-
+    const mailOptionsUser = {
+      from: process.env.EMAIL_USERNAME,
+      to: email,
       subject: getSubject(emailType),
       html: html,
     };
-    // Send email to admin
-    mailOptions.to = process.env.EMAIL_USERNAME;
 
-    const info = await transporter.sendMail(mailOptions);
-
-    // Optionally send email to user based on email type
     if (emailType === "Newsletter") {
-      mailOptions.to = email;
-      const userInfo = await transporter.sendMail(mailOptions);
-      console.log(`${emailType} Email sent to user: ${userInfo.response}`);
+      // Send email to admin
+      const infoAdmin = await transporter.sendMail(mailOptionsAdmin);
+      console.log(`Newsletter Email sent to admin: ${infoAdmin.response}`);
+
+         // Send email to user
+         const infoUser = await transporter.sendMail(mailOptionsUser);
+         console.log(`Newsletter Email sent to user: ${infoUser.response}`);
+    } else {
+    // Send email to user
+    const infoUser = await transporter.sendMail(mailOptionsUser);
+    console.log(`${emailType} Email sent to user: ${infoUser.response}`);
     }
-    console.log(`${emailType} Email sent: ${info.response}`);
+
     return true;
   } catch (error) {
     console.error("Error sending email:", error);
@@ -78,6 +50,12 @@ exports.mailFlexSend = async (email, emailType, html) => {
 
 function getSubject(emailType) {
   switch (emailType) {
+    case "Register":
+      return "Welcome to Our FlexiGeeks Project";
+    case "ForgetOTP":
+      return "ForgetOTP account";
+    case "RegisterOTP":
+      return "OTP Verification";
     case "ContributionRegister":
       return "New Contribution Registered";
     case "Proposal":
@@ -86,6 +64,7 @@ function getSubject(emailType) {
       return "New About Us Submission";
     case "Newsletter":
       return "FlexiGeeks Newsletter Signup";
+
     default:
       throw new Error("Invalid email type");
   }

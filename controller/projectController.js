@@ -9,7 +9,8 @@ const { uploadFileOnCloudinary } = require("../utils/cloudinary/cloudniary");
 const {
   aboutEmail,
 } = require("../mailsend/flexMailSend/mailFlexHtmlHelper.js/aboutHelperMail");
-const { newsletterEmail } = require("../mailsend/flexMailSend/mailFlexHtmlHelper.js/newsLetter");
+const { userNewsletterEmail } = require("../mailsend/flexMailSend/mailFlexHtmlHelper.js/userNewsLetter");
+const { adminNewsletterEmail } = require("../mailsend/flexMailSend/mailFlexHtmlHelper.js/adminNewsLetter");
 
 exports.contributionRegister = async (req, res) => {
   try {
@@ -31,12 +32,19 @@ exports.contributionRegister = async (req, res) => {
       number,
       email
     );
+    console.log("Email content:", emailContent);
 
     const emailType = "ContributionRegister";
-    const response = await mailFlexSend(emailType, emailContent);
+    const response = await mailFlexSend(emailType, emailContent,email);
     console.log("Email response:", response);
+    if (response) {
+      res
+        .status(200)
+        .json({ success: true, message: "Mail sent successfully" });
+    }else{
+      res.status(500).json({ success: false, message: "Failed to send mail" });
+    }
 
-    res.status(200).json({ success: true, message: "Mail sent successfully" });
   } catch (error) {
     console.error("Error sending mail:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -94,9 +102,15 @@ exports.proposalController = async (req, res) => {
       avatar
     );
     const emailType = "Proposal";
-    const response = await mailFlexSend(emailType, emailContent);
+    const response = await mailFlexSend(emailType, emailContent,email);
     console.log("Email response:", response);
-    res.status(200).json({ success: true, message: "Mail sent successfully" });
+    if (response) {
+      res
+        .status(200)
+        .json({ success: true, message: "Mail sent successfully" });
+    }else{
+      res.status(500).json({ success: false, message: "Failed to send mail" });
+    }
   } catch (error) {
     console.error("Error submitting proposal:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -108,25 +122,43 @@ exports.aboutContoller = async (req, res) => {
     const { fullName, email, number, message } = req.body;
     const emailContent = aboutEmail(fullName, email, number, message);
     const emailType = "About";
-    const response = await mailFlexSend(emailType, emailContent);
+    const response = await mailFlexSend(emailType, emailContent,email);
     console.log("Email response:", response);
-    res.status(200).json({ success: true, message: "Mail sent successfully" });
+    if (response) {
+      res
+        .status(200)
+        .json({ success: true, message: "Mail sent successfully" });
+    }else{
+      res.status(500).json({ success: false, message: "Failed to send mail" });
+    }
   } catch (error) {
     console.error("Error sending about us mail:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-exports.newslettlerController = async(req,res)=>{
+
+
+exports.newslettlerController = async (req, res) => {
   try {
     const { email } = req.body;
-    console.log("email",email)
-    const emailContent = newsletterEmail();
+    
+    const userEmailContent = userNewsletterEmail();
+    const adminEmailContent = adminNewsletterEmail(email);
+    
     const emailType = "Newsletter";
-    const response = await mailFlexSend(email,emailType, emailContent);
+    
+    const response = await mailFlexSend(emailType, userEmailContent, email,adminEmailContent);
     console.log("Email response:", response);
-    res.status(200).json({ success: true, message: "Mail sent successfully" });
+    
+    if (response) {
+      res
+        .status(200)
+        .json({ success: true, message: "Mail sent successfully" });
+    }else{
+      res.status(500).json({ success: false, message: "Failed to send mail" });
+    }
   } catch (error) {
     console.error("Error sending newsletter mail:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
