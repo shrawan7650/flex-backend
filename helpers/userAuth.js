@@ -2,7 +2,8 @@ require("dotenv").config();
 const bcryptjs = require("bcryptjs");
 
 // password hash function
-exports.hashPassword = async ({ password }) => {
+exports.hashPassword = async ( password ) => {
+  console.log("hashpasswordcheckfuntion",password)
   try {
     
     const hashPassword = await bcryptjs.hash(password, 10);

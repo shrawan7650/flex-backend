@@ -3,16 +3,14 @@ const app = express();
 const cors = require("cors");
 const morgan = require("morgan");
 const userRoute = require("./routes/user/userRoutes");
-const matrial = require("./routes/material/materialRoutes")
-const blogRoute = require("./routes/blog/blogRoutes");
-// const userAuthRoute = require("./routes/user/auth/userAuth")
-const projectRoute =  require("./routes/project/allProject")
+const jobRoute = require("./routes/jobRoute/jobRoutes");
+const applicantRoute = require("./routes/application/applicantRoute");
 const cookieParser = require("cookie-parser");
-// const passport = require("passport");
-// const passprtSetup = require("./passort.JS")
+const passport = require("passport");
+
 //use middlewear
 app.use(express.json());
-app.use(express.urlencoded());
+
 app.use(express.static("public"));
 app.use(morgan("dev"));
 app.use(cookieParser());
@@ -22,7 +20,7 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: "http://localhost:5173", // Adjust the origin to your frontend URL
+    origin: ["http://localhost:5173", "http://localhost:5174"], // Adjust the origin to your frontend URL
 
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
     credentials: true,
@@ -34,9 +32,6 @@ app.use(
 
 //routes all
 app.use("/api/users", userRoute);
-// app.use("/auth",userAuthRoute)
-app.use("/api/blog",blogRoute)
-app.use("/folders",matrial)
-app.use("/api/projects", projectRoute);
-
+app.use("/api/job", jobRoute);
+app.use("/api/applicant", applicantRoute);
 module.exports = app;
